@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+        <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=apINGrOhshowMVlno1R1f1Dl"></script>
+        <title>百度地图 Hello, World</title>
+        <style type="text/css">
+            body, html,#allmap {width: 100%;height: 100%;overflow: hidden;margin:0;}
+        </style>
+    </head>
+    <body>
+        <div id="allmap"></div>
+    </body>
+</html>
+<script type="text/javascript">
+
+    // °Ù¶ÈµØÍŒAPI¹ŠÄÜ
+var map = new BMap.Map("allmap");            // ŽŽœšMapÊµÀý
+//var point = new BMap.Point(116.404, 39.915);    // ŽŽœšµã×ø±ê
+var point = new BMap.Point(116.404, 39.915);    // ŽŽœšµã×ø±ê
+map.centerAndZoom(point,15);                     // ³õÊŒ»¯µØÍŒ,ÉèÖÃÖÐÐÄµã×ø±êºÍµØÍŒŒ¶±ð¡£
+map.enableScrollWheelZoom();                            //ÆôÓÃ¹öÂÖ·ÅŽóËõÐ¡
+
+var transit = new BMap.TransitRoute(map, {
+renderOptions: {map: map}
+});
+transit.search("Íõž®Ÿ®", "Î÷µ¥");
+
+map.setCurrentCity("ÉîÛÚ");
+
+map.addControl(new BMap.NavigationControl());
+//var local =  new BMap.LocalSearch(map, {renderOptions: {map: map, autoViewport: false, onSearchComplete:getLocalResults}}); 
+var local =  new BMap.LocalSearch(map, {renderOptions: {map: map, autoViewport: false}}); 
+
+local.setSearchCompleteCallback(getLocalResults);
+local.setInfoHtmlSetCallback(infoCallback);
+
+var plarr = new Array();
+var blarr = new Array();
+
+var lineshandle = 0;
+var bls = new BMap.BusLineSearch(map,{
+    renderOptions:{map:map, autoViewport:false},
+        onGetBusListComplete: function(result){
+           if(result) {
+             var fstLine = result.getBusListItem(0);//��ȡ��һ�������б���ʾ��map��
+             bls.getBusLine(fstLine);
+           }
+        },
+        onGetBusLineComplete: function(line){
+//        var polyline = line.getPolyline();
+        var points = line.getPath();
+        blarr.push(line);
+        bls.clearResults();
+        var polyline = new BMap.Polyline(points);
+//        polyline.setStrokeColor("#555555");
+//        polyline.setStrokeWeight(5);
+        plarr.push(polyline);
+        lineshandle = lineshandle + 1;
+        if(lineshandle>=linescount){
+            while(plarr.length>0){
+                map.addOverlay(plarr.pop());
+            }
+        }
+//        map.addOverlay(new BMap.Polyline(points));
+        }
+});
+
+
+var txtMenuItem = [
+{
+text:"附近公交站",
+         callback:function(p){
+             alert("local bus2");
+             alert(p.lng + "," + p.lat);
+             //        var marker = new BMap.Marker(p);
+             //            map.addOverlay(marker);
+             var circle = new BMap.Circle(p, 1000,{fillColor:"blue", strokeWeight: 1 ,fillOpacity: 0.3, strokeOpacity: 0.3});
+             map.addOverlay(circle);
+//             var local =  new BMap.LocalSearch(map, {renderOptions: {map: map, autoViewport: false, onSearchComplete:getLocalResults}});  
+ //            var local =  new BMap.LocalSearch(map);  
+             var bounds = getSquareBounds(circle.getCenter(),circle.getRadius());
+
+	     alert("result cnt: 2");
+             local.searchInBounds("公交站", bounds);
+	
+             
+         }
+}
+];
+
+var linescount = 0;
+function infoCallback(poi, html){
+    linescount = 0;
+    lineshandle = 0;
+    alert("title: "+poi.title);
+    alert("车次: "+html.innerText.replace("车次：", ""));
+	var linesname = html.innerText.replace("车次：", "");
+	var lines = linesname.split("; ");
+    alert("total lines: "+lines.length);
+    linescount = lines.length;
+    for(var i=0; i<lines.length; i++){
+        bls.getBusList(lines[i]);
+    }
+
+
+}
+
+function wait(condition){
+    if(!condition)
+        setTimeout("wait()", 1000);
+    else
+        return true;
+}
+
+function getLocalResults(results){
+//	var results = local.getResults();
+	alert("search complete");
+	alert("province:" + results.province + "radius:" + results.radius);
+             var cnt = results.getNumPois();
+	     alert("result cnt:" + cnt);
+             for(var i=0; i<1; i++){
+                var poi = results.getPoi(i);
+                if(poi.type == BMAP_POI_TYPE_BUSSTOP){
+		    alert("busstation title: " + poi.title);
+		    alert("busstation url: " + poi.url);
+                    addBusStation(poi.point);
+		}
+             }
+}
+
+var cm = new BMap.ContextMenu();
+for(var i=0; i<txtMenuItem.length; i++){
+    cm.addItem(new BMap.MenuItem(txtMenuItem[i].text, txtMenuItem[i].callback, 100));
+}
+map.addContextMenu(cm);
+
+function addBusStation(point){
+    map.addOverlay(new BMap.Marker(point));
+}
+
+//current city
+function myFun(result){
+    var cityName = result.name;
+    map.setCenter(cityName);
+
+}
+
+function getSquareBounds(centerPoi,r){
+        var a = Math.sqrt(2) * r; //Õý·œÐÎ±ß³€
+      
+        mPoi = getMecator(centerPoi);
+        var x0 = mPoi.x, y0 = mPoi.y;
+     
+        var x1 = x0 + a / 2 , y1 = y0 + a / 2;//¶«±±µã
+        var x2 = x0 - a / 2 , y2 = y0 - a / 2;//Î÷ÄÏµã
+        
+        var ne = getPoi(new BMap.Pixel(x1, y1)), sw = getPoi(new BMap.Pixel(x2, y2));
+        return new BMap.Bounds(sw, ne);        
+        
+    }
+
+    //žùŸÝÇòÃæ×ø±ê»ñµÃÆœÃæ×ø±ê¡£
+    function getMecator(poi){
+        return map.getMapType().getProjection().lngLatToPoint(poi);
+    }
+    //žùŸÝÆœÃæ×ø±ê»ñµÃÇòÃæ×ø±ê¡£
+    function getPoi(mecator){
+        return map.getMapType().getProjection().pointToLngLat(mecator);
+    }
+
+
+var myCity = new BMap.LocalCity();
+myCity.get(myFun);
+
+
+</script>
+
